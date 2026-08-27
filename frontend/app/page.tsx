@@ -1,18 +1,23 @@
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { Suspense } from "react";
+import { ScannerForm } from "@/components/scanner-form";
+import { NavAuthStatus } from "@/components/nav-auth-status";
+import { SiteFooter } from "@/components/site-footer";
 
 const features = [
   {
     title: "Urgency detection",
-    description: "Flags messages that pressure you to act immediately, click now, or verify an account without warning.",
+    description:
+      "Flags messages that pressure you to act immediately, click now, or verify an account without warning.",
   },
   {
     title: "Sender spoofing checks",
-    description: "Identifies mismatched domains, lookalike addresses, and fake brand impersonation patterns.",
+    description:
+      "Identifies mismatched domains, lookalike addresses, and fake brand impersonation patterns.",
   },
   {
     title: "Malware signal spotting",
-    description: "Detects suspicious links, shortened URLs, and scam language often used in phishing attempts.",
+    description:
+      "Detects suspicious links, shortened URLs, and scam language often used in phishing attempts.",
   },
 ];
 
@@ -40,15 +45,7 @@ const stats = [
   { value: "24/7", label: "always-on protection" },
 ];
 
-export default async function Home() {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
-  const isLoggedIn = Boolean(user);
-  const firstName = String(user?.user_metadata?.first_name ?? "");
-  const lastName = String(user?.user_metadata?.last_name ?? "");
-  const displayName = [firstName, lastName].filter(Boolean).join(" ") || user?.email?.split("@")[0] || "User";
-
+export default function Home() {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#020617_0%,#0f172a_30%,#111827_65%,#0b1120_100%)] text-white transition-colors duration-700 ease-out scroll-smooth">
       <div className="mx-auto max-w-7xl px-6 pb-20 pt-6 lg:px-8">
@@ -63,40 +60,21 @@ export default async function Home() {
           </div>
 
           <div className="hidden items-center gap-8 text-sm text-slate-300 md:flex">
-            <a href="#features" className="transition hover:text-white">Features</a>
-            <a href="#how-it-works" className="transition hover:text-white">How it works</a>
-            <a href="#security" className="transition hover:text-white">Security</a>
+            <a href="#features" className="transition hover:text-white">
+              Features
+            </a>
+            <a href="#how-it-works" className="transition hover:text-white">
+              How it works
+            </a>
+            <a href="#security" className="transition hover:text-white">
+              Security
+            </a>
           </div>
 
           <div className="flex items-center gap-2">
-            {isLoggedIn ? (
-              <div className="flex items-center gap-2">
-                <span className="hidden rounded-full border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-200 sm:inline-block">
-                  Welcome, {displayName}
-                </span>
-                <Link
-                  href="/protected"
-                  className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20"
-                >
-                  Profile
-                </Link>
-              </div>
-            ) : (
-              <>
-                <a
-                  href="/auth/login"
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:bg-white/10"
-                >
-                  Login
-                </a>
-                <a
-                  href="/auth/sign-up"
-                  className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20"
-                >
-                  Sign Up
-                </a>
-              </>
-            )}
+            <Suspense fallback={null}>
+              <NavAuthStatus />
+            </Suspense>
           </div>
         </nav>
 
@@ -111,7 +89,8 @@ export default async function Home() {
             </h1>
 
             <p className="mt-5 max-w-xl text-lg text-slate-300">
-              Paste a message or upload an image to check if it looks like a scam, fake alert, or urgent phishing attempt.
+              Paste a message or upload an image to check if it looks like a
+              scam, fake alert, or urgent phishing attempt.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
@@ -125,9 +104,16 @@ export default async function Home() {
 
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
               {stats.map((stat) => (
-                <div key={stat.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-2xl font-bold text-white">{stat.value}</div>
-                  <div className="mt-1 text-xs text-slate-300">{stat.label}</div>
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                >
+                  <div className="text-2xl font-bold text-white">
+                    {stat.value}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-300">
+                    {stat.label}
+                  </div>
                 </div>
               ))}
             </div>
@@ -137,7 +123,9 @@ export default async function Home() {
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
                 <p className="text-sm text-slate-400">Scanner</p>
-                <p className="text-lg font-semibold text-white">Input your message</p>
+                <p className="text-lg font-semibold text-white">
+                  Input your message
+                </p>
               </div>
               <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-200">
                 Live check
@@ -145,65 +133,69 @@ export default async function Home() {
             </div>
 
             <div className="mt-4 space-y-4">
-              <label className="block">
-                <span className="mb-2 block text-sm text-slate-300">Paste text</span>
-                <textarea
-                  placeholder="Example: Your account has been suspended. Verify now to avoid permanent lockout..."
-                  className="h-28 w-full resize-none rounded-2xl border border-white/10 bg-slate-950/80 p-4 text-sm leading-6 text-slate-100 placeholder:text-slate-500 outline-none focus:border-emerald-400"
-                />
-              </label>
-
-              <div className="rounded-2xl border border-dashed border-white/15 bg-slate-950/70 p-4">
-                <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-6 text-center">
-                  <span className="text-2xl">📷</span>
-                  <span className="text-sm font-medium text-white">Upload screenshot or image</span>
-                  <span className="text-xs text-slate-400">PNG, JPG, or PDF preview</span>
-                  <input type="file" accept="image/*,.pdf" className="hidden" />
-                </label>
-              </div>
-
-              <a
-                href="/results"
-                className="block w-full rounded-full bg-emerald-500 px-5 py-3 text-center font-semibold text-slate-950 transition hover:bg-emerald-400"
-              >
-                Scan for phishing
-              </a>
+              <ScannerForm />
             </div>
-
           </div>
         </section>
 
         <section id="features" className="mt-16 pt-8">
           <div className="mb-8 text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-300">Why teams use it</p>
-            <h2 className="mt-3 text-3xl font-bold text-white md:text-4xl">Built to catch the warning signs before damage happens.</h2>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-300">
+              Why teams use it
+            </p>
+            <h2 className="mt-3 text-3xl font-bold text-white md:text-4xl">
+              Built to catch the warning signs before damage happens.
+            </h2>
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">
             {features.map((feature) => (
-              <div key={feature.title} className="rounded-3xl border border-white/10 bg-white/5 p-6">
+              <div
+                key={feature.title}
+                className="rounded-3xl border border-white/10 bg-white/5 p-6"
+              >
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-2xl text-emerald-300">
                   ✓
                 </div>
-                <h3 className="text-xl font-semibold text-white">{feature.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-slate-300">{feature.description}</p>
+                <h3 className="text-xl font-semibold text-white">
+                  {feature.title}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-slate-300">
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
         </section>
 
-        <section id="how-it-works" className="mt-24 rounded-[32px] border border-white/10 bg-slate-900/70 p-8 md:p-10">
+        <section
+          id="how-it-works"
+          className="mt-24 rounded-[32px] border border-white/10 bg-slate-900/70 p-8 md:p-10"
+        >
           <div className="mb-8 text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">How it works</p>
-            <h2 className="mt-3 text-3xl font-bold text-white">Fast checks, clear answers.</h2>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">
+              How it works
+            </p>
+            <h2 className="mt-3 text-3xl font-bold text-white">
+              Fast checks, clear answers.
+            </h2>
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">
             {steps.map((step) => (
-              <div key={step.number} className="rounded-3xl border border-white/10 bg-slate-950/70 p-6">
-                <div className="text-sm font-semibold text-cyan-300">{step.number}</div>
-                <h3 className="mt-4 text-xl font-semibold text-white">{step.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-slate-300">{step.text}</p>
+              <div
+                key={step.number}
+                className="rounded-3xl border border-white/10 bg-slate-950/70 p-6"
+              >
+                <div className="text-sm font-semibold text-cyan-300">
+                  {step.number}
+                </div>
+                <h3 className="mt-4 text-xl font-semibold text-white">
+                  {step.title}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-slate-300">
+                  {step.text}
+                </p>
               </div>
             ))}
           </div>
@@ -213,8 +205,12 @@ export default async function Home() {
           <div className="rounded-[32px] border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 via-slate-900 to-cyan-500/10 p-8 md:p-12">
             <div className="grid items-center gap-8 md:grid-cols-[1fr_auto]">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-300">Security-first</p>
-                <h2 className="mt-3 text-3xl font-bold text-white md:text-4xl">Protect inboxes, teams, and customers from phishing attacks.</h2>
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-300">
+                  Security-first
+                </p>
+                <h2 className="mt-3 text-3xl font-bold text-white md:text-4xl">
+                  Protect inboxes, teams, and customers from phishing attacks.
+                </h2>
               </div>
 
               <button className="rounded-full bg-white px-6 py-3 font-semibold text-slate-950 transition hover:bg-slate-200">
@@ -224,6 +220,8 @@ export default async function Home() {
           </div>
         </section>
       </div>
+
+      <SiteFooter />
     </main>
   );
 }

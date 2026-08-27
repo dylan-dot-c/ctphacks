@@ -1,0 +1,45 @@
+
+> build
+> next build
+
+▲ Next.js 16.3.3 (Turbopack)
+- Environments: .env
+✓ Running next.config.ts took 118ms
+- Cache Components enabled
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 8.1s
+  Running TypeScript ...
+  Finished TypeScript in 10.1s ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/17) ...
+  Generating static pages using 7 workers (4/17) 
+  Generating static pages using 7 workers (8/17) 
+  Generating static pages using 7 workers (12/17) 
+✓ Generating static pages using 7 workers (17/17) in 2.1s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ◐ /
+├ ○ /_not-found
+├ ƒ /auth/confirm
+├ ◐ /auth/error
+├ ○ /auth/forgot-password
+├ ○ /auth/login
+├ ○ /auth/sign-up
+├ ○ /auth/sign-up-success
+├ ○ /auth/update-password
+├ ○ /opengraph-image.png
+├ ƒ /protected
+├ ○ /results
+├ ○ /save-report
+├ ○ /scan-history
+└ ○ /twitter-image.png
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)             prerendered as static content
+◐  (Partial Prerender)  prerendered as static HTML with dynamic server-streamed content
+ƒ  (Dynamic)            server-rendered on demand
+

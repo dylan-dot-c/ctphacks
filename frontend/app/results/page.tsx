@@ -1,77 +1,228 @@
-const warningSigns = [
-  "Urgent threat that claims the account will be suspended within 24 hours.",
-  "Direct request to verify credentials via a link or form.",
-  "Impersonation of a trusted organization or security team.",
-  "Pressure to act immediately without checking official channels.",
-];
+"use client";
 
-const findings = [
-  {
-    title: "Urgency Detection",
-    text: "The message creates fear by threatening account suspension within 24 hours. This is a common social engineering tactic used to rush the victim into action.",
-  },
-  {
-    title: "Threat / Fear Tactics",
-    text: "It relies on panic and urgency rather than a legitimate business explanation, which is a strong signal of scam activity.",
-  },
-  {
-    title: "Impersonation Analysis",
-    text: 'The phrasing mimics a security notice from a brand or provider, but there is no clear trusted context or verifiable sender identity.',
-  },
-  {
-    title: "Credential Harvesting Risk",
-    text: "The message asks the user to verify credentials through a link, which is a classic sign of phishing designed to steal login details.",
-  },
-];
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import {
+  analyzeQuick,
+  analyzeDetailed,
+  fetchAnalysisById,
+  getAccessToken,
+  describeApiError,
+  type QuickAnalysisResult,
+  type DetailedAnalysisResult,
+} from "@/lib/api";
+import { SCAN_MESSAGE_KEY, SCAN_IMAGE_KEY } from "@/components/scanner-form";
+import { SiteNavbar } from "@/components/site-navbar";
+import { SiteFooter } from "@/components/site-footer";
 
-const evidence = [
-  {
-    quote: '"Your account will be suspended within 24 hours."',
-    reason: "Artificial urgency / fear tactic",
-  },
-  {
-    quote: '"Verify your password here."',
-    reason: "Possible credential harvesting",
-  },
-  {
-    quote: '"Click the secure link to restore access."',
-    reason: "Suspicious request to use a crafted link instead of official channels",
-  },
-];
+const RESULT_CACHE_PREFIX = "phishing_result_cache_";
 
-const socialEngineering = [
-  "Urgency",
-  "Fear",
-  "Authority",
-  "Impersonation",
-  "Reward or prize",
-  "Credential harvesting",
-  "Financial pressure",
-];
+interface CachedResult {
+  quickResult: QuickAnalysisResult | null;
+  detailedResult: DetailedAnalysisResult | null;
+}
 
-const preventionTips = [
-  "Do not click suspicious links or respond to the sender.",
-  "Visit the organization’s official website directly instead of using the link in the message.",
-  "Change your password immediately if credentials were entered anywhere.",
-  "Enable multi-factor authentication on the account.",
-  "Contact your financial institution if banking details were shared.",
-];
+function saveResultCache(id: string, data: CachedResult) {
+  try {
+    sessionStorage.setItem(RESULT_CACHE_PREFIX + id, JSON.stringify(data));
+  } catch {
+    // ignore storage errors (quota, private browsing, etc.)
+  }
+}
 
-const riskBreakdown = [
-  { label: "Overall Risk", value: "87 / 100" },
-  { label: "Urgency", value: "High" },
-  { label: "Impersonation", value: "High" },
-  { label: "Credential Request", value: "Very High" },
-  { label: "Financial Request", value: "Low" },
-  { label: "Suspicious Link", value: "High" },
-];
+function loadResultCache(id: string): CachedResult | null {
+  try {
+    const raw = sessionStorage.getItem(RESULT_CACHE_PREFIX + id);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
-const riskScore = 87;
-const isHighRisk = riskScore >= 70;
+const RISK_BREAKDOWN_MAX: Record<string, number> = {
+  urgency: 20,
+  impersonation: 20,
+  credential_request: 25,
+  suspicious_link: 20,
+  financial_request: 10,
+  other_risk: 5,
+};
 
-export default function ResultsPage() {
+const RISK_LEVEL_LABEL: Record<string, string> = {
+  low: "Low risk",
+  suspicious: "Suspicious",
+  high: "High risk",
+  very_high: "Very high risk",
+};
+
+function riskLevelClasses(level: string) {
+  if (level === "very_high" || level === "high") {
+    return {
+      panel: "rounded-2xl border border-red-500/30 bg-red-500/10 p-5",
+      label: "text-sm uppercase tracking-[0.2em] text-red-200",
+      value: "text-lg text-red-200",
+      bar: "h-full rounded-full bg-gradient-to-r from-red-500 via-red-400 to-rose-500",
+    };
+  }
+  if (level === "suspicious") {
+    return {
+      panel: "rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5",
+      label: "text-sm uppercase tracking-[0.2em] text-amber-200",
+      value: "text-lg text-amber-200",
+      bar: "h-full rounded-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500",
+    };
+  }
+  return {
+    panel: "rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5",
+    label: "text-sm uppercase tracking-[0.2em] text-emerald-200",
+    value: "text-lg text-emerald-200",
+    bar: "h-full rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400",
+  };
+}
+
+function ResultsContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const historyId = searchParams.get("id");
+  const initializedRef = useRef(false);
+
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+
+  const [quickResult, setQuickResult] = useState<QuickAnalysisResult | null>(
+    null,
+  );
+  const [quickLoading, setQuickLoading] = useState(true);
+  const [quickError, setQuickError] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
+
+  const [detailedResult, setDetailedResult] =
+    useState<DetailedAnalysisResult | null>(null);
+  const [detailedLoading, setDetailedLoading] = useState(false);
+  const [detailedError, setDetailedError] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
+
+  const runScan = useCallback(async () => {
+    const stored = sessionStorage.getItem(SCAN_MESSAGE_KEY);
+    const storedImage = sessionStorage.getItem(SCAN_IMAGE_KEY);
+
+    const token = await getAccessToken();
+    setIsLoggedIn(Boolean(token));
+
+    if (!stored && !storedImage) {
+      setQuickLoading(false);
+      setQuickError({
+        title: "No message to analyze",
+        message:
+          "Go back home and paste a message or upload a screenshot to scan.",
+      });
+      return;
+    }
+
+    setQuickLoading(true);
+    setQuickError(null);
+    let quick: QuickAnalysisResult | null = null;
+    try {
+      quick = await analyzeQuick(stored ?? "", storedImage ?? undefined);
+      setQuickResult(quick);
+    } catch (err) {
+      setQuickError(describeApiError(err));
+    } finally {
+      setQuickLoading(false);
+    }
+
+    let detailed: DetailedAnalysisResult | null = null;
+    if (token) {
+      setDetailedLoading(true);
+      setDetailedError(null);
+      try {
+        detailed = await analyzeDetailed(
+          stored ?? "",
+          token,
+          storedImage ?? undefined,
+        );
+        setDetailedResult(detailed);
+      } catch (err) {
+        setDetailedError(describeApiError(err));
+      } finally {
+        setDetailedLoading(false);
+      }
+    }
+
+    // Cache the question/image + results and tag the URL with an id so
+    // reopening this exact result (back button, refresh, share) doesn't
+    // re-run the AI analysis.
+    if (quick || detailed) {
+      const id = detailed?.analysis_id ?? crypto.randomUUID();
+      saveResultCache(id, { quickResult: quick, detailedResult: detailed });
+      router.replace(`/results?id=${id}`, { scroll: false });
+    }
+  }, [router]);
+
+  const loadHistoryItem = useCallback(async (id: string) => {
+    const cached = loadResultCache(id);
+    if (cached) {
+      setQuickResult(cached.quickResult);
+      setDetailedResult(cached.detailedResult);
+      setQuickLoading(false);
+      const token = await getAccessToken();
+      setIsLoggedIn(cached.detailedResult ? true : Boolean(token));
+      return;
+    }
+
+    setQuickLoading(true);
+    const token = await getAccessToken();
+    setIsLoggedIn(Boolean(token));
+
+    if (!token) {
+      setQuickLoading(false);
+      setQuickError({
+        title: "Sign in required",
+        message: "Please sign in to view saved analyses.",
+      });
+      return;
+    }
+
+    setDetailedLoading(true);
+    try {
+      const result = await fetchAnalysisById(id, token);
+      setDetailedResult(result);
+      saveResultCache(id, { quickResult: null, detailedResult: result });
+      setQuickError(null);
+    } catch (err) {
+      setQuickError(describeApiError(err));
+    } finally {
+      setQuickLoading(false);
+      setDetailedLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Guard against re-running when our own router.replace adds ?id= after a scan
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    if (historyId) {
+      loadHistoryItem(historyId);
+    } else {
+      runScan();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const primary = detailedResult ?? quickResult;
+  const riskScore = primary?.risk_score ?? 0;
+  const riskLevel = primary?.risk_level ?? "low";
+  const classes = riskLevelClasses(riskLevel);
+
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#020617_0%,#0f172a_30%,#111827_65%,#0b1120_100%)] text-white">
+      <div className="mx-auto max-w-5xl px-6 pt-6 lg:px-8">
+        <SiteNavbar />
+      </div>
       <div className="mx-auto max-w-5xl px-6 py-10 lg:px-8">
         <div className="mb-6 flex items-center justify-between gap-4">
           <a
@@ -80,264 +231,296 @@ export default function ResultsPage() {
           >
             Home
           </a>
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-300">Quick safety result</p>
-            <h1 className="mt-3 text-4xl font-black tracking-tight text-white">Likely Credential Phishing</h1>
+          <div className="text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-300">
+              {quickResult ? "Quick safety result" : "Saved analysis"}
+            </p>
+            <h1 className="mt-3 text-4xl font-black tracking-tight text-white">
+              {primary ? primary.summary.split(".")[0] : "Analyzing message..."}
+            </h1>
           </div>
           <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-200">
-            Most likely type: Credential Phishing
+            {primary ? primary.classification.replaceAll("_", " ") : "..."}
           </span>
         </div>
 
-        <section className="rounded-[28px] border border-white/10 bg-slate-900/80 p-6 md:p-8">
-          <div className="flex flex-wrap gap-2">
-            {['Credential phishing', 'Urgent action request', 'Suspicious link', 'Impersonation'].map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.15em] text-slate-200"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-8 grid gap-8 md:grid-cols-[1.1fr_0.9fr]">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">Summary</p>
-              <p className="mt-4 text-lg leading-8 text-slate-200">
-                This message appears designed to create panic and trick the recipient into entering account credentials or following a dangerous link. The request is urgent, the sender is not clearly trustworthy, and the action requested is a common phishing pattern.
-              </p>
-            </div>
-
-            <div
-              className={
-                isHighRisk
-                  ? "rounded-2xl border border-red-500/30 bg-red-500/10 p-5"
-                  : "rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5"
-              }
-            >
-              <p className={isHighRisk ? "text-sm uppercase tracking-[0.2em] text-red-200" : "text-sm uppercase tracking-[0.2em] text-amber-200"}>Quick verdict</p>
-              <div className="mt-4 flex items-end justify-between gap-4">
-                <span className="text-4xl font-black text-white">{riskScore}</span>
-                <span className={isHighRisk ? "text-lg text-red-200" : "text-lg text-amber-200"}>/ 100</span>
-              </div>
-              <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
-                <div
-                  className={
-                    isHighRisk
-                      ? "h-full rounded-full bg-gradient-to-r from-red-500 via-red-400 to-rose-500"
-                      : "h-full rounded-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500"
-                  }
-                  style={{ width: `${riskScore}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8 rounded-2xl border border-white/10 bg-slate-950/60 p-5">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-rose-300">Top warning signs</p>
-            <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-200">
-              {warningSigns.map((warning) => (
-                <li key={warning} className="flex gap-3">
-                  <span className="mt-1 text-rose-400">●</span>
-                  <span>{warning}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        <section className="mt-10 rounded-[28px] border border-white/10 bg-slate-900/80 p-6 md:p-8">
-          <div className="mb-5">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">Detailed Analysis</p>
-            <h2 className="mt-3 text-2xl font-bold text-white">Detailed Security Analysis</h2>
-          </div>
-
-          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70 p-5">
-            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent" />
-            <div className="relative space-y-5 text-slate-200">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.15em] text-cyan-300">Detailed Security Analysis</p>
-                <div className="mt-3 h-3 w-full rounded-full bg-slate-800" />
-                <div className="mt-2 h-3 w-5/6 rounded-full bg-slate-800" />
-                <div className="mt-2 h-3 w-4/5 rounded-full bg-slate-800" />
-              </div>
-
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.15em] text-cyan-300">Social Engineering Techniques</p>
-                <div className="mt-3 h-3 w-full rounded-full bg-slate-800" />
-                <div className="mt-2 h-3 w-11/12 rounded-full bg-slate-800" />
-              </div>
-
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.15em] text-cyan-300">Suspicious Evidence</p>
-                <div className="mt-3 h-3 w-full rounded-full bg-slate-800" />
-                <div className="mt-2 h-3 w-5/6 rounded-full bg-slate-800" />
-              </div>
-
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.15em] text-cyan-300">Link Analysis</p>
-                <div className="mt-3 h-3 w-full rounded-full bg-slate-800" />
-                <div className="mt-2 h-3 w-4/5 rounded-full bg-slate-800" />
-              </div>
-
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.15em] text-cyan-300">Recommended Next Steps</p>
-                <div className="mt-3 h-3 w-full rounded-full bg-slate-800" />
-                <div className="mt-2 h-3 w-4/5 rounded-full bg-slate-800" />
-              </div>
-            </div>
-
-            <div className="relative z-10 mt-8 flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-900/60 p-6 text-center">
-              <div className="mb-3 text-4xl">🔒</div>
-              <h3 className="text-2xl font-bold text-white">Unlock Detailed Results</h3>
-              <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">
-                Sign in to see exactly why this message was flagged and what to do next.
-              </p>
-              <div className="mt-5 flex flex-wrap justify-center gap-3">
-                <a
-                  href="/auth/login"
-                  className="rounded-full bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400"
-                >
-                  Sign In
-                </a>
-                <a
-                  href="/auth/sign-up"
-                  className="rounded-full border border-white/10 bg-white/5 px-5 py-3 font-semibold text-white transition hover:bg-white/10"
-                >
-                  Create Account
-                </a>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-10 rounded-[28px] border border-white/10 bg-slate-900/80 p-6 md:p-8">
-          <div className="mb-6">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-300">Signed-In Detailed Results</p>
-            <h2 className="mt-3 text-2xl font-bold text-white">Full risk breakdown</h2>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {riskBreakdown.map((item) => (
-              <div key={item.label} className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                <div className="text-sm text-slate-400">{item.label}</div>
-                <div className="mt-2 text-xl font-bold text-white">{item.value}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 space-y-6">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">Evidence From the Message</p>
-              <div className="mt-5 space-y-4">
-                {evidence.map((item) => (
-                  <div key={item.quote} className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                    <p className="text-lg font-medium text-white">{item.quote}</p>
-                    <p className="mt-3 text-sm text-slate-300">Flagged because:</p>
-                    <p className="mt-1 text-emerald-300">{item.reason}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">Social Engineering Analysis</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {socialEngineering.map((item) => (
-                  <span key={item} className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-sm text-cyan-200">
-                    {item}
-                  </span>
-                ))}
-              </div>
-              <p className="mt-4 text-base leading-7 text-slate-200">
-                The message uses classic phishing patterns: urgency, fear, impersonation, and a direct call to action. It tries to bypass the consumer’s natural caution by creating the feeling that a problem is immediate and must be solved now without verifying the source.
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">Recommended Actions</p>
-              <ol className="mt-4 list-decimal space-y-3 pl-5 text-base leading-7 text-slate-200">
-                {preventionTips.map((tip) => (
-                  <li key={tip}>{tip}</li>
-                ))}
-              </ol>
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-10 rounded-[28px] border border-white/10 bg-slate-900/80 p-6 md:p-8">
-          <div className="mb-5">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">Saving the Analysis</p>
-            <h2 className="mt-3 text-2xl font-bold text-white">Authenticated users only</h2>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-5">
-            <p className="text-sm text-slate-300">Only authenticated users have analysis records stored permanently.</p>
-
-            <div className="mt-5 overflow-hidden rounded-xl border border-white/10 bg-slate-900/60">
-              <div className="border-b border-white/10 bg-slate-950/70 px-4 py-2 text-sm font-semibold text-white">analysis</div>
-              <div className="divide-y divide-white/10 text-sm text-slate-200">
-                <div className="flex justify-between gap-4 px-4 py-3"><span>id</span><span className="text-slate-400">uuid</span></div>
-                <div className="flex justify-between gap-4 px-4 py-3"><span>user_id</span><span className="text-slate-400">string</span></div>
-                <div className="flex justify-between gap-4 px-4 py-3"><span>message_text</span><span className="text-slate-400">text</span></div>
-                <div className="flex justify-between gap-4 px-4 py-3"><span>risk_score</span><span className="text-slate-400">integer</span></div>
-                <div className="flex justify-between gap-4 px-4 py-3"><span>risk_level</span><span className="text-slate-400">string</span></div>
-                <div className="flex justify-between gap-4 px-4 py-3"><span>classification</span><span className="text-slate-400">string</span></div>
-                <div className="flex justify-between gap-4 px-4 py-3"><span>summary</span><span className="text-slate-400">text</span></div>
-                <div className="flex justify-between gap-4 px-4 py-3"><span>reasons</span><span className="text-slate-400">json</span></div>
-                <div className="flex justify-between gap-4 px-4 py-3"><span>recommended_actions</span><span className="text-slate-400">json</span></div>
-                <div className="flex justify-between gap-4 px-4 py-3"><span>created_at</span><span className="text-slate-400">timestamp</span></div>
-              </div>
-            </div>
-
-            <p className="mt-5 text-sm leading-6 text-slate-300">
-              Guest scans may be processed temporarily but should not automatically become part of a permanent user history.
+        {quickLoading && (
+          <section className="rounded-[28px] border border-white/10 bg-slate-900/80 p-8 text-center">
+            <p className="text-slate-300">
+              Scanning the message for phishing indicators...
             </p>
-          </div>
-        </section>
+          </section>
+        )}
 
-        <section className="mt-10 rounded-[28px] border border-white/10 bg-slate-900/80 p-6 md:p-8">
-          <div className="mb-5">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-300">Signed-In Result Actions</p>
-            <h2 className="mt-3 text-2xl font-bold text-white">Available actions</h2>
-          </div>
+        {!quickLoading && quickError && (
+          <section className="rounded-[28px] border border-rose-500/30 bg-rose-500/10 p-8 text-center">
+            <h2 className="text-xl font-bold text-white">{quickError.title}</h2>
+            <p className="mt-3 text-rose-100">{quickError.message}</p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <button
+                onClick={() =>
+                  historyId ? loadHistoryItem(historyId) : runScan()
+                }
+                className="rounded-full bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400"
+              >
+                Try again
+              </button>
+              <a
+                href="/"
+                className="rounded-full border border-white/10 bg-white/5 px-5 py-3 font-semibold text-white transition hover:bg-white/10"
+              >
+                Home
+              </a>
+            </div>
+          </section>
+        )}
 
-          <div className="flex flex-wrap gap-3">
-            <a
-              href="/save-report"
-              className="rounded-full border border-red-500/30 bg-red-500/10 px-5 py-3 font-semibold text-red-100 transition hover:bg-red-500/20"
-            >
-              Save Report
-            </a>
-            <a
-              href="/"
-              className="rounded-full border border-white/10 bg-white/5 px-5 py-3 font-semibold text-white transition hover:bg-white/10"
-            >
-              Analyze Another Message
-            </a>
+        {!quickLoading && !quickError && primary && (
+          <>
+            <section className="rounded-[28px] border border-white/10 bg-slate-900/80 p-6 md:p-8">
+              <div className="mt-2 grid gap-8 md:grid-cols-[1.1fr_0.9fr]">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">
+                    Summary
+                  </p>
+                  <p className="mt-4 text-lg leading-8 text-slate-200">
+                    {primary.summary}
+                  </p>
+                </div>
+
+                <div className={classes.panel}>
+                  <p className={classes.label}>
+                    {RISK_LEVEL_LABEL[riskLevel] ?? riskLevel}
+                  </p>
+                  <div className="mt-4 flex items-end justify-between gap-4">
+                    <span className="text-4xl font-black text-white">
+                      {riskScore}
+                    </span>
+                    <span className={classes.value}>/ 100</span>
+                  </div>
+                  <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
+                    <div
+                      className={classes.bar}
+                      style={{ width: `${riskScore}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 rounded-2xl border border-white/10 bg-slate-950/60 p-5">
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-rose-300">
+                  Top warning signs
+                </p>
+                <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-200">
+                  {primary.warning_signs.map((warning) => (
+                    <li key={warning.title} className="flex gap-3">
+                      <span className="mt-1 text-rose-400">●</span>
+                      <span>
+                        <span className="font-semibold text-white">
+                          {warning.title}:
+                        </span>{" "}
+                        {warning.description}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {quickResult && (
+                <div className="mt-6 rounded-2xl border border-white/10 bg-slate-950/60 p-5">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">
+                    Quick recommendation
+                  </p>
+                  <p className="mt-3 text-slate-200">
+                    {quickResult.quick_recommendation}
+                  </p>
+                </div>
+              )}
+            </section>
+
+            <section className="mt-10 rounded-[28px] border border-white/10 bg-slate-900/80 p-6 md:p-8">
+              <div className="mb-5">
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">
+                  Detailed Analysis
+                </p>
+                <h2 className="mt-3 text-2xl font-bold text-white">
+                  Detailed Security Analysis
+                </h2>
+              </div>
+
+              {isLoggedIn === false && (
+                <div className="relative flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-900/60 p-10 text-center">
+                  <div className="mb-3 text-4xl">🔒</div>
+                  <h3 className="text-2xl font-bold text-white">
+                    Unlock Detailed Results
+                  </h3>
+                  <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">
+                    Sign in to see exactly why this message was flagged and what
+                    to do next.
+                  </p>
+                  <div className="mt-5 flex flex-wrap justify-center gap-3">
+                    <a
+                      href="/auth/login"
+                      className="rounded-full bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400"
+                    >
+                      Sign In
+                    </a>
+                    <a
+                      href="/auth/sign-up"
+                      className="rounded-full border border-white/10 bg-white/5 px-5 py-3 font-semibold text-white transition hover:bg-white/10"
+                    >
+                      Create Account
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {isLoggedIn && detailedLoading && (
+                <p className="text-center text-slate-300">
+                  Loading detailed breakdown...
+                </p>
+              )}
+
+              {isLoggedIn && !detailedLoading && detailedError && (
+                <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6 text-center">
+                  <h3 className="text-lg font-bold text-white">
+                    {detailedError.title}
+                  </h3>
+                  <p className="mt-2 text-rose-100">{detailedError.message}</p>
+                </div>
+              )}
+
+              {isLoggedIn && !detailedLoading && detailedResult && (
+                <div className="space-y-6">
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {Object.entries(detailedResult.risk_breakdown).map(
+                      ([key, value]) => (
+                        <div
+                          key={key}
+                          className="rounded-2xl border border-white/10 bg-slate-950/60 p-4"
+                        >
+                          <div className="text-sm text-slate-400">
+                            {key.replaceAll("_", " ")}
+                          </div>
+                          <div className="mt-2 text-xl font-bold text-white">
+                            {value} / {RISK_BREAKDOWN_MAX[key] ?? "?"}
+                          </div>
+                        </div>
+                      ),
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">
+                      Evidence From the Message
+                    </p>
+                    <div className="mt-5 space-y-4">
+                      {detailedResult.evidence.map((item, i) => (
+                        <div
+                          key={i}
+                          className="rounded-2xl border border-white/10 bg-slate-950/60 p-4"
+                        >
+                          <p className="text-lg font-medium text-white">
+                            &quot;{item.text}&quot;
+                          </p>
+                          <p className="mt-3 text-sm text-slate-300">
+                            Flagged because:
+                          </p>
+                          <p className="mt-1 text-emerald-300">{item.reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">
+                      Social Engineering Analysis
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {detailedResult.social_engineering.map((item, i) => (
+                        <span
+                          key={i}
+                          className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-sm text-cyan-200"
+                          title={item.explanation}
+                        >
+                          {item.technique} ({item.severity})
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {detailedResult.detected_urls.length > 0 && (
+                    <div>
+                      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">
+                        Detected Links
+                      </p>
+                      <div className="mt-4 space-y-3">
+                        {detailedResult.detected_urls.map((item, i) => (
+                          <div
+                            key={i}
+                            className="rounded-2xl border border-white/10 bg-slate-950/60 p-4"
+                          >
+                            <p className="break-all font-mono text-sm text-white">
+                              {item.url}
+                            </p>
+                            <p className="mt-2 text-sm text-slate-300">
+                              {item.reason}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-300">
+                      Recommended Actions
+                    </p>
+                    <ol className="mt-4 list-decimal space-y-3 pl-5 text-base leading-7 text-slate-200">
+                      {[...detailedResult.recommended_actions]
+                        .sort((a, b) => a.priority - b.priority)
+                        .map((tip) => (
+                          <li key={tip.priority}>{tip.action}</li>
+                        ))}
+                    </ol>
+                  </div>
+
+                  <p className="text-xs text-slate-500">
+                    Saved {new Date(detailedResult.created_at).toLocaleString()}
+                  </p>
+                </div>
+              )}
+            </section>
+          </>
+        )}
+
+        <div className="mt-10 flex flex-wrap justify-center gap-3">
+          <a
+            href="/"
+            className="rounded-full bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400"
+          >
+            Analyze Another Message
+          </a>
+          {isLoggedIn && (
             <a
               href="/scan-history"
-              className="rounded-full border border-red-500/30 bg-red-500/10 px-5 py-3 font-semibold text-red-100 transition hover:bg-red-500/20"
+              className="rounded-full border border-white/10 bg-white/5 px-5 py-3 font-semibold text-white transition hover:bg-white/10"
             >
               View Scan History
             </a>
-          </div>
-
-          <p className="mt-5 text-sm leading-6 text-slate-300">
-            Because the user is authenticated, the result can automatically be associated with their account.
-          </p>
-        </section>
-
-        <div className="mt-8 flex justify-center">
-          <a
-            href="/"
-            className="rounded-full border border-white/10 bg-white/5 px-5 py-3 font-semibold text-white transition hover:bg-white/10"
-          >
-            Home
-          </a>
+          )}
         </div>
       </div>
+
+      <SiteFooter />
     </main>
+  );
+}
+
+export default function ResultsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResultsContent />
+    </Suspense>
   );
 }

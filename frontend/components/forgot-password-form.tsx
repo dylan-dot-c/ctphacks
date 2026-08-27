@@ -53,7 +53,7 @@ export function ForgotPasswordForm({
             <CardDescription>Password reset instructions sent</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-slate-300">
               If you registered using your email and password, you will receive
               a password reset email.
             </p>
@@ -87,11 +87,11 @@ export function ForgotPasswordForm({
                   {isLoading ? "Sending..." : "Send reset email"}
                 </Button>
               </div>
-              <div className="mt-4 text-center text-sm">
+              <div className="mt-4 text-center text-sm text-slate-300">
                 Already have an account?{" "}
                 <Link
                   href="/auth/login"
-                  className="underline underline-offset-4"
+                  className="text-white underline underline-offset-4"
                 >
                   Login
                 </Link>

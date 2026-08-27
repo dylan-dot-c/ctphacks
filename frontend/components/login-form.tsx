@@ -78,7 +78,7 @@ export function LoginForm({
                   <Label htmlFor="password">Password</Label>
                   <Link
                     href="/auth/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+                    className="ml-auto inline-block text-sm text-slate-300 underline-offset-4 hover:text-white hover:underline"
                   >
                     Forgot your password?
                   </Link>
@@ -100,17 +100,20 @@ export function LoginForm({
                 {isLoading ? "Logging in..." : "Login"}
               </Button>
             </div>
-            <div className="mt-4 text-center text-sm">
+            <div className="mt-4 text-center text-sm text-slate-300">
               Don&apos;t have an account?{" "}
               <Link
                 href="/auth/sign-up"
-                className="underline underline-offset-4"
+                className="text-white underline underline-offset-4"
               >
                 Sign up
               </Link>
             </div>
             <div className="mt-3 text-center text-sm">
-              <Link href="/" className="underline underline-offset-4">
+              <Link
+                href="/"
+                className="text-slate-300 underline underline-offset-4 hover:text-white"
+              >
                 Back to Home
               </Link>
             </div>

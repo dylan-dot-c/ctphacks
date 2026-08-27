@@ -48,18 +48,19 @@ export function SignUpForm({
     }
 
     try {
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            full_name: `${firstName.trim()} ${lastName.trim()}`,
+      const { data: signUpData, error: signUpError } =
+        await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+              full_name: `${firstName.trim()} ${lastName.trim()}`,
+            },
+            emailRedirectTo: `${window.location.origin}/protected`,
           },
-          emailRedirectTo: `${window.location.origin}/protected`,
-        },
-      });
+        });
 
       if (signUpError) throw signUpError;
 
@@ -86,7 +87,9 @@ export function SignUpForm({
       <Card className="border border-emerald-400/20 bg-slate-900/40 shadow-[0_30px_90px_rgba(15,23,42,0.9),0_12px_30px_rgba(16,185,129,0.15),inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-1px_0_rgba(15,23,42,0.6)] backdrop-blur-2xl">
         <CardHeader>
           <CardTitle className="text-2xl text-white">Sign up</CardTitle>
-          <CardDescription className="text-slate-300">Create a new account</CardDescription>
+          <CardDescription className="text-slate-300">
+            Create a new account
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignUp}>
@@ -159,14 +162,20 @@ export function SignUpForm({
                 {isLoading ? "Creating an account..." : "Sign up"}
               </Button>
             </div>
-            <div className="mt-4 text-center text-sm">
+            <div className="mt-4 text-center text-sm text-slate-300">
               Already have an account?{" "}
-              <Link href="/auth/login" className="underline underline-offset-4">
+              <Link
+                href="/auth/login"
+                className="text-white underline underline-offset-4"
+              >
                 Login
               </Link>
             </div>
             <div className="mt-3 text-center text-sm">
-              <Link href="/" className="underline underline-offset-4">
+              <Link
+                href="/"
+                className="text-slate-300 underline underline-offset-4 hover:text-white"
+              >
                 Back to Home
               </Link>
             </div>
