@@ -1,6 +1,6 @@
-import { Suspense } from "react";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
 import { ScannerForm } from "@/components/scanner-form";
-import { NavAuthStatus } from "@/components/nav-auth-status";
 
 const features = [
   {
@@ -44,7 +44,18 @@ const stats = [
   { value: "24/7", label: "always-on protection" },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  const isLoggedIn = Boolean(user);
+  const firstName = String(user?.user_metadata?.first_name ?? "");
+  const lastName = String(user?.user_metadata?.last_name ?? "");
+  const displayName =
+    [firstName, lastName].filter(Boolean).join(" ") ||
+    user?.email?.split("@")[0] ||
+    "User";
+
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#020617_0%,#0f172a_30%,#111827_65%,#0b1120_100%)] text-white transition-colors duration-700 ease-out scroll-smooth">
       <div className="mx-auto max-w-7xl px-6 pb-20 pt-6 lg:px-8">
@@ -71,9 +82,34 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Suspense fallback={null}>
-              <NavAuthStatus />
-            </Suspense>
+            {isLoggedIn ? (
+              <div className="flex items-center gap-2">
+                <span className="hidden rounded-full border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-200 sm:inline-block">
+                  Welcome, {displayName}
+                </span>
+                <Link
+                  href="/protected"
+                  className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20"
+                >
+                  Profile
+                </Link>
+              </div>
+            ) : (
+              <>
+                <a
+                  href="/auth/login"
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                >
+                  Login
+                </a>
+                <a
+                  href="/auth/sign-up"
+                  className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20"
+                >
+                  Sign Up
+                </a>
+              </>
+            )}
           </div>
         </nav>
 
@@ -131,9 +167,7 @@ export default function Home() {
               </span>
             </div>
 
-            <div className="mt-4 space-y-4">
-              <ScannerForm />
-            </div>
+            <ScannerForm />
           </div>
         </section>
 
