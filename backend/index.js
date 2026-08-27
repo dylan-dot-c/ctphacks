@@ -18,6 +18,11 @@ app.get("/api/hello", (req, res) => {
   res.json({ message: `Hello, ${name}!` });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
-});
+// Vercel imports this file as a serverless function, so only listen when run directly
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server listening on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
