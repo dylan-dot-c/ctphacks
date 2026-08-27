@@ -35,14 +35,18 @@ const history = [
 
 export default async function ProtectedPage() {
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
+  const { data: userData, error } = await supabase.auth.getUser();
 
-  if (error || !data?.claims) {
+  if (error || !userData?.user) {
     redirect("/auth/login");
   }
 
-  const email = String(data.claims.email ?? "user@example.com");
-  const username = email.split("@")[0] || "User";
+  const user = userData.user;
+  const email = String(user.email ?? "user@example.com");
+  const firstName = String(user.user_metadata?.first_name ?? "");
+  const lastName = String(user.user_metadata?.last_name ?? "");
+  const displayName = firstName || email.split("@")[0] || "User";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ") || email.split("@")[0] || "User";
 
   return (
     <div className="w-full max-w-6xl px-4 py-8 text-white">
@@ -50,7 +54,7 @@ export default async function ProtectedPage() {
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-300">Dashboard</p>
           <h1 className="mt-3 text-3xl font-black tracking-tight text-white md:text-4xl">
-            Welcome back, {username}
+            Welcome back, {displayName}
           </h1>
         </div>
 
@@ -86,8 +90,9 @@ export default async function ProtectedPage() {
           <p className="mt-3 text-3xl font-bold text-white">12</p>
         </div>
         <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-          <p className="text-sm text-slate-400">Account email</p>
-          <p className="mt-3 text-lg font-semibold text-emerald-200">{email}</p>
+          <p className="text-sm text-slate-400">Profile ID</p>
+          <p className="mt-3 text-lg font-semibold text-emerald-200">{fullName}</p>
+          <p className="mt-2 text-sm text-slate-300">{email}</p>
         </div>
       </div>
 

@@ -24,7 +24,7 @@ const historyItems = [
 
 export default function ScanHistoryPage() {
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#020617_0%,#0f172a_30%,#111827_65%,#0b1120_100%)] text-white">
       <div className="mx-auto max-w-5xl px-6 py-10 lg:px-8">
         <div className="mb-8">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">Scan history</p>

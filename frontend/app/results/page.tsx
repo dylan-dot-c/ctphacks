@@ -71,7 +71,7 @@ const isHighRisk = riskScore >= 70;
 
 export default function ResultsPage() {
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#020617_0%,#0f172a_30%,#111827_65%,#0b1120_100%)] text-white">
       <div className="mx-auto max-w-5xl px-6 py-10 lg:px-8">
         <div className="mb-6 flex items-center justify-between gap-4">
           <a

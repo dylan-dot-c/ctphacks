@@ -42,11 +42,15 @@ const stats = [
 
 export default async function Home() {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
-  const isLoggedIn = Boolean(data?.claims);
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  const isLoggedIn = Boolean(user);
+  const firstName = String(user?.user_metadata?.first_name ?? "");
+  const lastName = String(user?.user_metadata?.last_name ?? "");
+  const displayName = [firstName, lastName].filter(Boolean).join(" ") || user?.email?.split("@")[0] || "User";
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#020617_0%,#0f172a_30%,#111827_65%,#0b1120_100%)] text-white transition-colors duration-700 ease-out scroll-smooth">
       <div className="mx-auto max-w-7xl px-6 pb-20 pt-6 lg:px-8">
         <nav className="flex items-center justify-between rounded-full border border-white/10 bg-white/5 px-5 py-3 backdrop-blur-sm">
           <div className="flex items-center gap-3">
@@ -54,7 +58,7 @@ export default async function Home() {
               🛡️
             </div>
             <div>
-              <p className="text-lg font-semibold">PhishLens</p>
+              <p className="text-lg font-semibold">PhishingHook</p>
             </div>
           </div>
 
@@ -66,12 +70,17 @@ export default async function Home() {
 
           <div className="flex items-center gap-2">
             {isLoggedIn ? (
-              <Link
-                href="/protected"
-                className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20"
-              >
-                Profile
-              </Link>
+              <div className="flex items-center gap-2">
+                <span className="hidden rounded-full border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-200 sm:inline-block">
+                  Welcome, {displayName}
+                </span>
+                <Link
+                  href="/protected"
+                  className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20"
+                >
+                  Profile
+                </Link>
+              </div>
             ) : (
               <>
                 <a

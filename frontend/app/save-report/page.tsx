@@ -10,7 +10,7 @@ const savedReport = {
 
 export default function SaveReportPage() {
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#020617_0%,#0f172a_30%,#111827_65%,#0b1120_100%)] text-white">
       <div className="mx-auto max-w-4xl px-6 py-10 lg:px-8">
         <div className="rounded-[30px] border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-slate-900 to-cyan-500/10 p-8 md:p-10">
           <div className="flex items-center gap-3 text-emerald-300">
