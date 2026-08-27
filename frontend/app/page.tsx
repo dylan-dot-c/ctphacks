@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+
 const features = [
   {
     title: "Urgency detection",
@@ -37,7 +40,11 @@ const stats = [
   { value: "24/7", label: "always-on protection" },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  const isLoggedIn = Boolean(data?.claims);
+
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto max-w-7xl px-6 pb-20 pt-6 lg:px-8">
@@ -57,9 +64,31 @@ export default function Home() {
             <a href="#security" className="transition hover:text-white">Security</a>
           </div>
 
-          <button className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20">
-            Try demo
-          </button>
+          <div className="flex items-center gap-2">
+            {isLoggedIn ? (
+              <Link
+                href="/protected"
+                className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20"
+              >
+                Profile
+              </Link>
+            ) : (
+              <>
+                <a
+                  href="/auth/login"
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                >
+                  Login
+                </a>
+                <a
+                  href="/auth/sign-up"
+                  className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1.5 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20"
+                >
+                  Sign Up
+                </a>
+              </>
+            )}
+          </div>
         </nav>
 
         <section className="grid items-center gap-12 pb-12 pt-16 lg:grid-cols-[1.1fr_0.9fr] lg:pt-20">
@@ -124,21 +153,14 @@ export default function Home() {
                 </label>
               </div>
 
-              <button className="w-full rounded-full bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400">
+              <a
+                href="/results"
+                className="block w-full rounded-full bg-emerald-500 px-5 py-3 text-center font-semibold text-slate-950 transition hover:bg-emerald-400"
+              >
                 Scan for phishing
-              </button>
+              </a>
             </div>
 
-            <div className="mt-5 rounded-2xl border border-slate-700 bg-slate-950/80 p-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-400">Risk score</span>
-                <span className="font-semibold text-amber-300">87% likely phishing</span>
-              </div>
-
-              <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
-                <div className="h-full w-[87%] rounded-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500" />
-              </div>
-            </div>
           </div>
         </section>
 

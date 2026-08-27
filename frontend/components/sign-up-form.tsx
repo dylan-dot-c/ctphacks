@@ -58,10 +58,10 @@ export function SignUpForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
+      <Card className="border border-emerald-400/20 bg-slate-900/40 shadow-[0_30px_90px_rgba(15,23,42,0.9),0_12px_30px_rgba(16,185,129,0.15),inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-1px_0_rgba(15,23,42,0.6)] backdrop-blur-2xl">
         <CardHeader>
-          <CardTitle className="text-2xl">Sign up</CardTitle>
-          <CardDescription>Create a new account</CardDescription>
+          <CardTitle className="text-2xl text-white">Sign up</CardTitle>
+          <CardDescription className="text-slate-300">Create a new account</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignUp}>
@@ -102,7 +102,11 @@ export function SignUpForm({
                 />
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full border border-emerald-300/40 bg-gradient-to-r from-emerald-400 to-cyan-400 text-slate-950 shadow-[0_10px_30px_rgba(16,185,129,0.35)] transition hover:translate-y-[-1px] hover:shadow-[0_16px_35px_rgba(16,185,129,0.45)]"
+                disabled={isLoading}
+              >
                 {isLoading ? "Creating an account..." : "Sign up"}
               </Button>
             </div>
@@ -110,6 +114,11 @@ export function SignUpForm({
               Already have an account?{" "}
               <Link href="/auth/login" className="underline underline-offset-4">
                 Login
+              </Link>
+            </div>
+            <div className="mt-3 text-center text-sm">
+              <Link href="/" className="underline underline-offset-4">
+                Back to Home
               </Link>
             </div>
           </form>
