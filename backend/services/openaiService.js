@@ -161,7 +161,9 @@ async function analyzeMessage(message, reqId = "-") {
         `[OpenAI ${reqId}] Status: ${info.httpStatus ?? "-"} ${info.reason ?? ""} - Message: ${info.message} - Duration: ${Date.now() - start}ms`,
       );
       if (info.retryAfter) {
-        console.log(`[OpenAI ${reqId}] Retry after: ${info.retryAfter}s - not retrying`);
+        console.log(
+          `[OpenAI ${reqId}] Retry after: ${info.retryAfter}s - not retrying`,
+        );
       }
       throw new AIApiError(info);
     }
@@ -215,7 +217,10 @@ function sleep(ms) {
 function classifyOpenAIError(err) {
   const message = err?.message ?? "Unknown OpenAI error";
 
-  if (/abort|timeout/i.test(message) || err?.name === "APIConnectionTimeoutError") {
+  if (
+    /abort|timeout/i.test(message) ||
+    err?.name === "APIConnectionTimeoutError"
+  ) {
     return { kind: "timeout", httpStatus: 504, message };
   }
 
@@ -231,7 +236,8 @@ function classifyOpenAIError(err) {
   let kind;
   if (httpStatus === 429) kind = "rate_limit";
   else if (httpStatus === 400) kind = "bad_request";
-  else if (httpStatus === 401 || httpStatus === 403) kind = "configuration_error";
+  else if (httpStatus === 401 || httpStatus === 403)
+    kind = "configuration_error";
   else if (httpStatus === 404) kind = "model_not_found";
   else if (httpStatus === 503 || httpStatus >= 500) kind = "unavailable";
   else kind = "unknown";
