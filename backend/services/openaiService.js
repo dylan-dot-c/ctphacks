@@ -131,7 +131,11 @@ Return JSON only, matching the provided schema exactly.`;
 
 async function analyzeMessage(message, reqId = "-") {
   if (!client) {
-    throw new Error("OPENAI_API_KEY is not configured");
+    throw new AIApiError({
+      kind: "configuration_error",
+      httpStatus: 500,
+      message: "OPENAI_API_KEY is not configured",
+    });
   }
 
   const start = Date.now();
@@ -285,4 +289,9 @@ function validateShape(parsed) {
   }
 }
 
-module.exports = { analyzeMessage, AIResponseError, AIApiError };
+module.exports = {
+  analyzeMessage,
+  classifyOpenAIError,
+  AIResponseError,
+  AIApiError,
+};

@@ -263,4 +263,60 @@ router.get("/analyses/:id", requireAuth, async (req, res) => {
   }
 });
 
+router.post("/analyses/:id/reevaluate", requireAuth, async (req, res) => {
+  const reqId = crypto.randomUUID().slice(0, 8);
+
+  try {
+    const source = await analysisService.getAnalysisSourceMessage(
+      req.user.id,
+      req.params.id,
+    );
+
+    if (source.status === "not_found") {
+      return res
+        .status(404)
+        .json({ error: "not_found", message: "Analysis not found." });
+    }
+
+    if (source.status === "forbidden") {
+      return res.status(403).json({
+        error: "forbidden",
+        message: "This analysis does not belong to you.",
+      });
+    }
+
+    const result = await runAnalysis(source.message, reqId);
+    const saved = await analysisService.saveAnalysis(
+      req.user.id,
+      source.message,
+      result,
+    );
+
+    return res.status(200).json({
+      analysis_id: saved.id,
+      risk_score: saved.risk_score,
+      risk_level: saved.risk_level,
+      classification: saved.classification,
+      summary: saved.summary,
+      warning_signs: saved.warning_signs,
+      risk_breakdown: saved.risk_breakdown,
+      social_engineering: saved.social_engineering,
+      evidence: saved.evidence,
+      detected_urls: saved.detected_urls,
+      recommended_actions: saved.recommended_actions,
+      created_at: saved.created_at,
+    });
+  } catch (err) {
+    if (err instanceof aiService.AIResponseError || err instanceof aiService.AIApiError) {
+      return handleAnalysisError(err, res, reqId);
+    }
+
+    console.error(`[Analysis ${reqId}] Reevaluation failed:`, err.message);
+    return res.status(500).json({
+      error: "internal_error",
+      message: "The analysis could not be reevaluated.",
+    });
+  }
+});
+
 module.exports = router;

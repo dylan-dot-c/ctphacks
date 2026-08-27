@@ -122,7 +122,11 @@ code fences or add commentary.`;
 
 async function analyzeMessage(message, reqId = "-") {
   if (!genAI) {
-    throw new Error("GEMINI_API_KEY is not configured");
+    throw new GeminiApiError({
+      kind: "configuration_error",
+      httpStatus: 500,
+      message: "GEMINI_API_KEY is not configured",
+    });
   }
 
   const model = genAI.getGenerativeModel(
@@ -274,4 +278,10 @@ function validateShape(parsed) {
   }
 }
 
-module.exports = { analyzeMessage, GeminiResponseError, GeminiApiError };
+module.exports = {
+  analyzeMessage,
+  classifyGeminiError,
+  validateShape,
+  GeminiResponseError,
+  GeminiApiError,
+};

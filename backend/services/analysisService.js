@@ -83,4 +83,33 @@ async function getAnalysisById(userId, id) {
   return { status: "ok", analysis };
 }
 
-module.exports = { saveAnalysis, listAnalyses, getAnalysisById };
+async function getAnalysisSourceMessage(userId, id) {
+  assertAdminClient();
+
+  const { data, error } = await supabaseAdmin
+    .from(TABLE)
+    .select("id, user_id, message_text")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return { status: "not_found" };
+  }
+
+  if (data.user_id !== userId) {
+    return { status: "forbidden" };
+  }
+
+  return { status: "ok", message: data.message_text };
+}
+
+module.exports = {
+  saveAnalysis,
+  listAnalyses,
+  getAnalysisById,
+  getAnalysisSourceMessage,
+};
