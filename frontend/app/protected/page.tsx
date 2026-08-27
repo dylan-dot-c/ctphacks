@@ -3,9 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { DashboardOverview } from "@/components/dashboard-overview";
 
-// Per-user dashboard behind auth - not eligible for static prerendering
-export const instant = false;
-
 export default async function ProtectedPage() {
   const supabase = await createClient();
   const { data: userData, error } = await supabase.auth.getUser();

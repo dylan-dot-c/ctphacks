@@ -118,28 +118,35 @@ const responseSchema = {
 };
 
 const SYSTEM_INSTRUCTION = `You are a phishing and scam detection analyst.
-Analyze ONLY the message text supplied by the user. Do not invent sender information,
-headers, or context that is not present in the message.
+Analyze ONLY the message text and/or image supplied by the user. If an image is provided,
+it is a screenshot of a message, email, or text conversation - read the visible text in it
+and analyze that content. Do not invent sender information, headers, or context that is not
+present in the message or image.
 Do not claim a URL is malicious unless there is clear evidence in the message itself;
 distinguish between "suspicious" (unverified) and "confirmed malicious" framing.
 Quote evidence snippets verbatim and keep them short - only quote text actually present
-in the user's message.
+in the user's message or visible in the image.
 Score each risk_breakdown component within its maximum:
 urgency 0-20, impersonation 0-20, credential_request 0-25, suspicious_link 0-20,
 financial_request 0-10, other_risk 0-5. These are independent component scores, not a total.
 Return JSON only, matching the provided schema exactly.`;
 
-async function analyzeMessage(message, reqId = "-") {
+async function analyzeMessage(input, reqId = "-") {
   if (!client) {
     throw new Error("OPENAI_API_KEY is not configured");
   }
 
+  const { message, image } =
+    typeof input === "string" ? { message: input, image: undefined } : input;
+
   const start = Date.now();
-  console.log(`[OpenAI ${reqId}] Request started (model: ${MODEL})`);
+  console.log(
+    `[OpenAI ${reqId}] Request started (model: ${MODEL}, image: ${Boolean(image)})`,
+  );
 
   let completion;
   try {
-    completion = await requestOnce(message, reqId, start);
+    completion = await requestOnce(message, image, reqId, start);
   } catch (err) {
     const info = classifyOpenAIError(err);
 
@@ -148,7 +155,7 @@ async function analyzeMessage(message, reqId = "-") {
       console.log(`[OpenAI ${reqId}] Retrying once in 1000ms...`);
       await sleep(1000);
       try {
-        completion = await requestOnce(message, reqId, start, true);
+        completion = await requestOnce(message, image, reqId, start, true);
       } catch (retryErr) {
         const retryInfo = classifyOpenAIError(retryErr);
         console.log(
@@ -183,15 +190,30 @@ async function analyzeMessage(message, reqId = "-") {
   return parsed;
 }
 
-async function requestOnce(message, reqId, start, isRetry = false) {
+async function requestOnce(message, image, reqId, start, isRetry = false) {
+  const content = [];
+
+  if (message) {
+    content.push({
+      type: "text",
+      text: `Analyze this message for phishing/scam indicators:\n\n${message}`,
+    });
+  }
+  if (image) {
+    if (!message) {
+      content.push({
+        type: "text",
+        text: "Analyze this screenshot for phishing/scam indicators.",
+      });
+    }
+    content.push({ type: "image_url", image_url: { url: image } });
+  }
+
   const completion = await client.chat.completions.create({
     model: MODEL,
     messages: [
       { role: "system", content: SYSTEM_INSTRUCTION },
-      {
-        role: "user",
-        content: `Analyze this message for phishing/scam indicators:\n\n${message}`,
-      },
+      { role: "user", content },
     ],
     response_format: {
       type: "json_schema",

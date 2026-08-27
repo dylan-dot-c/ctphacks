@@ -25,8 +25,8 @@ function buildQuickRecommendation(recommendedActions) {
 }
 
 // Runs the AI analysis and normalizes it into our stable shape; never trusts the model's own total
-async function runAnalysis(message, reqId) {
-  const raw = await aiService.analyzeMessage(message, reqId);
+async function runAnalysis(message, image, reqId) {
+  const raw = await aiService.analyzeMessage({ message, image }, reqId);
   const { risk_score, risk_breakdown } = riskService.calculateRiskScore(
     raw.risk_breakdown,
   );
@@ -114,11 +114,15 @@ router.post("/analyze/quick", quickAnalysisLimiter, async (req, res) => {
 
   const reqId = crypto.randomUUID().slice(0, 8);
   console.log(
-    `[Analysis ${reqId}] Request received (quick, ${validation.message.length} chars)`,
+    `[Analysis ${reqId}] Request received (quick, ${validation.message.length} chars, image: ${Boolean(validation.image)})`,
   );
 
   try {
-    const result = await runAnalysis(validation.message, reqId);
+    const result = await runAnalysis(
+      validation.message,
+      validation.image,
+      reqId,
+    );
     console.log(`[Analysis ${reqId}] Response returned`);
 
     return res.status(200).json({
@@ -151,14 +155,18 @@ router.post(
 
     const reqId = crypto.randomUUID().slice(0, 8);
     console.log(
-      `[Analysis ${reqId}] Request received (detailed, ${validation.message.length} chars)`,
+      `[Analysis ${reqId}] Request received (detailed, ${validation.message.length} chars, image: ${Boolean(validation.image)})`,
     );
 
     try {
-      const result = await runAnalysis(validation.message, reqId);
+      const result = await runAnalysis(
+        validation.message,
+        validation.image,
+        reqId,
+      );
       const saved = await analysisService.saveAnalysis(
         req.user.id,
-        validation.message,
+        validation.message || "[Image submission]",
         result,
       );
       console.log(`[Analysis ${reqId}] Response returned`);
