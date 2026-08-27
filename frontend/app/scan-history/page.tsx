@@ -7,8 +7,6 @@ import {
   describeApiError,
   type HistoryItem,
 } from "@/lib/api";
-import { SiteNavbar } from "@/components/site-navbar";
-import { SiteFooter } from "@/components/site-footer";
 
 const RISK_BADGE: Record<string, string> = {
   low: "border-emerald-500/20 bg-emerald-500/10 text-emerald-200",
@@ -42,9 +40,6 @@ export default function ScanHistoryPage() {
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#020617_0%,#0f172a_30%,#111827_65%,#0b1120_100%)] text-white">
-      <div className="mx-auto max-w-5xl px-6 pt-6 lg:px-8">
-        <SiteNavbar />
-      </div>
       <div className="mx-auto max-w-5xl px-6 py-10 lg:px-8">
         <div className="mb-8">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">
@@ -145,8 +140,6 @@ export default function ScanHistoryPage() {
           </a>
         </div>
       </div>
-
-      <SiteFooter />
     </main>
   );
 }

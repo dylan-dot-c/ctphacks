@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { ScannerForm } from "@/components/scanner-form";
 import { NavAuthStatus } from "@/components/nav-auth-status";
-import { SiteFooter } from "@/components/site-footer";
 
 const features = [
   {
@@ -220,8 +219,6 @@ export default function Home() {
           </div>
         </section>
       </div>
-
-      <SiteFooter />
     </main>
   );
 }

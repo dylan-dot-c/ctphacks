@@ -12,8 +12,6 @@ import {
   type DetailedAnalysisResult,
 } from "@/lib/api";
 import { SCAN_MESSAGE_KEY, SCAN_IMAGE_KEY } from "@/components/scanner-form";
-import { SiteNavbar } from "@/components/site-navbar";
-import { SiteFooter } from "@/components/site-footer";
 
 const RESULT_CACHE_PREFIX = "phishing_result_cache_";
 
@@ -220,9 +218,6 @@ function ResultsContent() {
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#020617_0%,#0f172a_30%,#111827_65%,#0b1120_100%)] text-white">
-      <div className="mx-auto max-w-5xl px-6 pt-6 lg:px-8">
-        <SiteNavbar />
-      </div>
       <div className="mx-auto max-w-5xl px-6 py-10 lg:px-8">
         <div className="mb-6 flex items-center justify-between gap-4">
           <a
@@ -511,8 +506,6 @@ function ResultsContent() {
           )}
         </div>
       </div>
-
-      <SiteFooter />
     </main>
   );
 }
