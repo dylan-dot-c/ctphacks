@@ -62,7 +62,14 @@
   * {
     @apply border-border;
   }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply text-slate-50;
+    background: linear-gradient(180deg, #020617 0%, #0f172a 30%, #111827 65%, #0b1120 100%);
+    font-family: Arial, Helvetica, sans-serif;
   }
 }
