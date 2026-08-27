@@ -57,7 +57,9 @@ function handleAnalysisError(err, res, reqId) {
   }
 
   if (err instanceof aiService.AIApiError) {
-    console.log(`[Analysis ${reqId}] Returning HTTP ${err.httpStatus ?? 503} (${err.kind})`);
+    console.log(
+      `[Analysis ${reqId}] Returning HTTP ${err.httpStatus ?? 503} (${err.kind})`,
+    );
 
     switch (err.kind) {
       case "rate_limit":
@@ -111,7 +113,9 @@ router.post("/analyze/quick", quickAnalysisLimiter, async (req, res) => {
   }
 
   const reqId = crypto.randomUUID().slice(0, 8);
-  console.log(`[Analysis ${reqId}] Request received (quick, ${validation.message.length} chars)`);
+  console.log(
+    `[Analysis ${reqId}] Request received (quick, ${validation.message.length} chars)`,
+  );
 
   try {
     const result = await runAnalysis(validation.message, reqId);
@@ -146,7 +150,9 @@ router.post(
     }
 
     const reqId = crypto.randomUUID().slice(0, 8);
-    console.log(`[Analysis ${reqId}] Request received (detailed, ${validation.message.length} chars)`);
+    console.log(
+      `[Analysis ${reqId}] Request received (detailed, ${validation.message.length} chars)`,
+    );
 
     try {
       const result = await runAnalysis(validation.message, reqId);
@@ -179,7 +185,10 @@ router.post(
         return handleAnalysisError(err, res, reqId);
       }
 
-      console.error(`[Analysis ${reqId}] Failed to save analysis:`, err.message);
+      console.error(
+        `[Analysis ${reqId}] Failed to save analysis:`,
+        err.message,
+      );
       return res.status(500).json({
         error: "internal_error",
         message: "The analysis could not be saved.",
